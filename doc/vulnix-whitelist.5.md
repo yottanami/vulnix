@@ -34,6 +34,10 @@ Each rule is started by a TOML section header. The following forms are allowed:
   Matches arbitrary derivations that are not covered by a more specific rule.
   Note that the `cve` field must be specified in this case.
 
+Any of these headers may also be written with double brackets (TOML's array of
+tables, e.g. `[["`<PROGRAM>`"]]`) to give several rules for the same program in
+one file. They are merged as described in [NOTES] below.
+
 Each rule is optionally followed by the following fields:
 
 * `cve = ["`<CVEID>`",` _..._`]`:

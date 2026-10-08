@@ -312,3 +312,39 @@ comment = "section headers consisting only of alphanum chars are ok"
 """
         )
     )
+
+
+def test_toml_array_of_tables():
+    wl = Whitelist.load(
+        io.StringIO(
+            """
+[["openssl-1.0.2"]]
+cve = "CVE-2018-0732"
+comment = "first"
+
+[["openssl-1.0.2"]]
+cve = ["CVE-2018-0737", "CVE-2018-0739"]
+comment = "second"
+issue_url = "https://tracker.example.com/1"
+
+["zlib"]
+comment = "plain sections still work next to [[...]]"
+"""
+        )
+    )
+    assert len(wl) == 2
+    openssl = wl["openssl-1.0.2"]
+    assert openssl.cve == {"CVE-2018-0732", "CVE-2018-0737", "CVE-2018-0739"}
+    assert openssl.comment == ["first", "second"]
+    assert openssl.issue_url == {"https://tracker.example.com/1"}
+    assert wl["zlib"].comment == ["plain sections still work next to [[...]]"]
+
+
+def test_toml_array_of_tables_alphanumeric():
+    wl = Whitelist.load(io.StringIO('[[systemd-236]]\ncve = "CVE-1"\n'))
+    assert wl["systemd-236"].cve == {"CVE-1"}
+
+
+def test_section_header_unexpected_space_array_of_tables():
+    with pytest.raises(RuntimeError):
+        Whitelist.load(io.StringIO('[[ "broken-section-1.1" ]]\ncomment = "x"\n'))

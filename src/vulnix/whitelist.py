@@ -16,8 +16,9 @@ _log = logging.getLogger(__name__)
 
 
 # brackets must be followed/preceded immediately by quotation marks
-RE_INV_SECT_START = re.compile(r'^\s*\[[^"a-zA-Z]', re.MULTILINE)
-RE_INV_SECT_END = re.compile(r'^\s*\[[^\]]*[^"a-zA-Z0-9]\]$', re.MULTILINE)
+# (a second bracket is allowed for TOML's array-of-tables syntax: [["..."]])
+RE_INV_SECT_START = re.compile(r'^\s*\[\[?[^"a-zA-Z\[]', re.MULTILINE)
+RE_INV_SECT_END = re.compile(r'^\s*\[\[?[^\]]*[^"a-zA-Z0-9\]]\]\]?$', re.MULTILINE)
 
 
 def check_section_header(content):
@@ -32,10 +33,12 @@ def check_section_header(content):
 def read_toml(content):
     check_section_header(content)
     for k, v in toml.loads(content, collections.OrderedDict).items():
-        if len(v.values()) and isinstance(list(v.values())[0], dict):
-            raise RuntimeError("malformed section header -- forgot quotes?", k)
-        pname, version = split_name(k)
-        yield WhitelistRule(pname=pname, version=version, **v)
+        # [["..."]] (array of tables) gives a list of rules for the same section
+        for entry in v if isinstance(v, list) else [v]:
+            if len(entry.values()) and isinstance(list(entry.values())[0], dict):
+                raise RuntimeError("malformed section header -- forgot quotes?", k)
+            pname, version = split_name(k)
+            yield WhitelistRule(pname=pname, version=version, **entry)
 
 
 def read_yaml(content):
@@ -218,7 +221,7 @@ class Whitelist:
         for rule in gen:
             if not self.SECTION_FORMAT.match(rule.pname):
                 raise RuntimeError("invalid package selector", rule.pname)
-            self.insert(rule)
+            self.update(rule)
         return self
 
     def dump(self):
