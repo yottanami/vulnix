@@ -36,7 +36,9 @@ Each rule is started by a TOML section header. The following forms are allowed:
 
 Any of these headers may also be written with double brackets (TOML's array of
 tables, e.g. `[["`<PROGRAM>`"]]`) to give several rules for the same program in
-one file. They are merged as described in [NOTES] below.
+one file. Their CVEs, comments and issue URLs are merged as described in
+[NOTES] below. Since the result is a single rule, all entries for the same
+package must have the same `until` value (or none of them).
 
 Each rule is optionally followed by the following fields:
 

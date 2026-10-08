@@ -32,13 +32,27 @@ def check_section_header(content):
 
 def read_toml(content):
     check_section_header(content)
-    for k, v in toml.loads(content, collections.OrderedDict).items():
+    try:
+        parsed = toml.loads(content, collections.OrderedDict)
+    except AttributeError as e:
+        # what the toml library raises for ["x"] followed by [["x"]]
+        raise RuntimeError(
+            'cannot mix ["..."] and [["..."]] headers for the same package'
+        ) from e
+    for k, v in parsed.items():
         # [["..."]] (array of tables) gives a list of rules for the same section
+        rules = []
         for entry in v if isinstance(v, list) else [v]:
             if len(entry.values()) and isinstance(list(entry.values())[0], dict):
                 raise RuntimeError("malformed section header -- forgot quotes?", k)
             pname, version = split_name(k)
-            yield WhitelistRule(pname=pname, version=version, **entry)
+            rules.append(WhitelistRule(pname=pname, version=version, **entry))
+        # they get merged into one rule, which can only have one expiry date
+        if len({rule.until for rule in rules}) > 1:
+            raise RuntimeError(
+                "[[...]] entries for the same package must share `until`", k
+            )
+        yield from rules
 
 
 def read_yaml(content):

@@ -348,3 +348,43 @@ def test_toml_array_of_tables_alphanumeric():
 def test_section_header_unexpected_space_array_of_tables():
     with pytest.raises(RuntimeError):
         Whitelist.load(io.StringIO('[[ "broken-section-1.1" ]]\ncomment = "x"\n'))
+
+
+@pytest.mark.parametrize(
+    "second_until",
+    ['until = "2099-01-01"\n', ""],
+)
+def test_toml_array_of_tables_differing_until(second_until):
+    with pytest.raises(RuntimeError):
+        Whitelist.load(
+            io.StringIO(
+                '[["openssl-1.0.2"]]\ncve = "CVE-2020-1111"\nuntil = "2021-01-01"\n\n'
+                '[["openssl-1.0.2"]]\ncve = "CVE-2020-2222"\n' + second_until
+            )
+        )
+
+
+def test_toml_array_of_tables_same_until():
+    wl = Whitelist.load(
+        io.StringIO(
+            '[["openssl-1.0.2"]]\ncve = "CVE-1"\nuntil = "2099-01-01"\n\n'
+            '[["openssl-1.0.2"]]\ncve = "CVE-2"\nuntil = 2099-01-01\n'
+        )
+    )
+    assert wl["openssl-1.0.2"].until == datetime.date(2099, 1, 1)
+
+
+def test_toml_mixed_table_and_array_of_tables():
+    with pytest.raises(RuntimeError):
+        Whitelist.load(
+            io.StringIO('["openssl"]\ncve = "CVE-1"\n\n[["openssl"]]\ncve = "CVE-2"\n')
+        )
+
+
+def test_yaml_same_name_merges():
+    wl = Whitelist.load(
+        io.StringIO(
+            "- name: openssl\n  cve: [CVE-A]\n- name: openssl\n  cve: [CVE-B]\n"
+        )
+    )
+    assert wl["openssl"].cve == {"CVE-A", "CVE-B"}
